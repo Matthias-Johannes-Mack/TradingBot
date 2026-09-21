@@ -9,7 +9,7 @@ from __future__ import annotations
 import csv
 import io
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from functools import lru_cache
 from typing import Any
@@ -113,6 +113,11 @@ class AlpacaPaperBroker:
 
     def clock(self) -> dict:
         return self.request("GET", "/clock")
+
+    def calendar(self, start: date, end: date) -> list[dict]:
+        """Trading days with New York open/close times; holidays are absent."""
+        result = self.request("GET", "/calendar", params={"start": start.isoformat(), "end": end.isoformat()})
+        return result if isinstance(result, list) else []
 
     def asset(self, symbol: str) -> dict:
         return self.request("GET", f"/assets/{symbol}")
