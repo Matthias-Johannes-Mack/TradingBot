@@ -24,7 +24,7 @@ from app.broker import AlpacaPaperBroker, BrokerError, PAPER_API_URL, decimal_te
 from app.strategy import PaperStrategy, PaperTick, PlanPreview, StrategyInput, build_preview
 from app.tax import amount, analysis, exit_estimate, TaxSettings
 from app.automation import AutomationWorker, activate_plan, list_plans, pause_plan
-from app import autopilot, research, watchlist
+from app import autopilot, market, research, watchlist
 from app.autopilot import AutopilotSettings
 from app.research import ResearchWorker
 from app.sources import tickers
@@ -515,9 +515,14 @@ def refresh_research(request: ResearchRefresh) -> dict:
     return {"started": True, "source": request.source or "all"}
 
 
+@app.get("/api/market/hours")
+def market_hours() -> dict:
+    return market.hours(AlpacaPaperBroker)
+
+
 @app.get("/api/watchlist")
 def watchlist_board() -> dict:
-    return {**autopilot.board(AUTOMATION_DB), "research": research_status()}
+    return {**autopilot.board(AUTOMATION_DB), "research": research_status(), "market": market_hours()}
 
 
 @app.post("/api/watchlist", status_code=201)

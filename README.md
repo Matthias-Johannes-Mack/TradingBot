@@ -38,6 +38,8 @@ These are the free primary sources behind QuiverQuant's congress, insider, contr
 
 **Scoring.** Each signal is weighted by its source, by its own size (dollar value, mention growth), and by age (half-life). Each source's total is capped, so thirty Reddit posts cannot outweigh one CEO buying $1M of stock. The sum becomes a 0–100 score: 50 means no evidence either way. Weights are research-based priors, not a fitted or backtested model; insider open-market buying is the best documented of these effects, and retail attention the weakest.
 
+**Trading hours.** Below the autopilot switch, a strip shows whether the US market is open, the next session in your own time zone (normally 15:30–22:00 in Germany), and a countdown to the next open or close. A 24-hour bar highlights the session. The times come from Alpaca's market calendar, so exchange holidays and early closes are included. Without Alpaca keys, the strip falls back to standard weekday hours. The autopilot only buys and sells inside these hours.
+
 **Watchlist rows.** A symbol joins the list automatically at score 58 with two independent sources, or 63 from one. It leaves once its score falls below 53. You can add symbols yourself, mute a symbol so it is never auto-bought, and open **All evidence** to see every filing or feed row behind a score, with links. The **Radar** filter shows the strongest symbols that have not qualified yet. Each row carries one intent:
 
 - **Buy next** – clears every gate; the next market-hours check buys it if the price and liquidity checks pass.

@@ -13,6 +13,104 @@ let watchFilter = 'all';
 let autopilotPreviewToken = null;
 let researchPoll = null;
 
+// US trading hours, shown in the viewer's own time zone. The open/closed state
+// is derived from the session times on every render, so it flips at the bell
+// even between server refreshes.
+let marketHours = null;
+const HOUR_MINUTE = { hour: '2-digit', minute: '2-digit' };
+function localTime(iso) { return new Date(iso).toLocaleTimeString([], HOUR_MINUTE); }
+function dayLabel(iso) {
+  const day = new Date(iso);
+  const midnight = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const offset = Math.round((midnight(day) - midnight(new Date())) / 86400000);
+  if (offset === 0) return 'today';
+  if (offset === 1) return 'tomorrow';
+  // English day names to match the rest of the interface; times keep the viewer's locale.
+  return day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function untilText(iso) {
+  const minutes = Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 60000));
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours >= 48) return `in ${Math.round(hours / 24)} days`;
+  return `in ${hours} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`;
+}
+function marketState() {
+  if (!marketHours?.sessions?.length) return null;
+  const now = Date.now();
+  const sessions = marketHours.sessions.filter((session) => new Date(session.close_at).getTime() > now);
+  const current = sessions.find((session) => new Date(session.open_at).getTime() <= now) || null;
+  return { current, next: sessions.find((session) => session !== current) || null, sessions };
+}
+function sessionBar(session, isCurrent) {
+  const opens = new Date(session.open_at);
+  const closes = new Date(session.close_at);
+  const midnight = new Date(opens.getFullYear(), opens.getMonth(), opens.getDate()).getTime();
+  const percent = (time) => (time - midnight) / 86400000 * 100;
+  const start = percent(opens.getTime());
+  const end = percent(closes.getTime());
+  const wrap = el('div', 'mh-day');
+  wrap.setAttribute('role', 'img');
+  wrap.setAttribute('aria-label', `US trading session ${dayLabel(session.open_at)} from ${localTime(session.open_at)} to ${localTime(session.close_at)} your time`);
+  const edges = el('div', 'mh-edges');
+  // A close after local midnight is labelled on the wrapped piece at the left.
+  [[start, localTime(session.open_at)], [end > 100 ? end - 100 : end, localTime(session.close_at)]].forEach(([at, text]) => {
+    const label = el('span', '', text);
+    label.style.left = `${at}%`;
+    label.style.transform = at < 5 ? 'none' : at > 95 ? 'translateX(-100%)' : 'translateX(-50%)';
+    edges.append(label);
+  });
+  const track = el('div', 'mh-track');
+  const band = (from, to) => {
+    const part = el('span', isCurrent ? 'mh-session live' : 'mh-session');
+    part.style.left = `${from}%`;
+    part.style.width = `${Math.max(0.5, to - from)}%`;
+    track.append(part);
+  };
+  band(Math.max(0, start), Math.min(100, end));
+  if (end > 100) band(0, end - 100); // A session that runs past local midnight wraps.
+  const now = percent(Date.now());
+  if (now >= 0 && now <= 100) {
+    const marker = el('i', 'mh-now');
+    marker.style.left = `${now}%`;
+    marker.title = `Now, ${new Date().toLocaleTimeString([], HOUR_MINUTE)}`;
+    track.append(marker);
+  }
+  const ticks = el('div', 'mh-ticks');
+  ['00:00', '06:00', '12:00', '18:00', '24:00'].forEach((tick) => ticks.append(el('span', '', tick)));
+  wrap.append(edges, track, ticks);
+  return wrap;
+}
+function renderMarketHours() {
+  const box = $('#market-hours');
+  const state = marketState();
+  box.replaceChildren();
+  box.hidden = !state;
+  if (!state) return;
+  const open = Boolean(state.current);
+  const session = state.current || state.next;
+  box.className = `market-hours ${open ? 'is-open' : 'is-closed'}`;
+  const head = el('div', 'mh-head');
+  head.append(el('span', 'mh-pill', open ? 'US market open' : 'US market closed'));
+  if (session) {
+    head.append(el('strong', 'mh-when', open
+      ? `Closes ${localTime(session.close_at)} · ${untilText(session.close_at)}`
+      : `Opens ${dayLabel(session.open_at)}, ${localTime(session.open_at)} · ${untilText(session.open_at)}`));
+  }
+  box.append(head);
+  if (!session) return;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const hours = el('p', 'mh-hours');
+  hours.append(document.createTextNode(`Trading hours ${dayLabel(session.open_at)} `),
+    el('b', '', `${localTime(session.open_at)} – ${localTime(session.close_at)}`),
+    document.createTextNode(` your time${zone ? ` (${zone.replaceAll('_', ' ')})` : ''} · ${session.open_new_york}–${session.close_new_york} New York`));
+  if (session.early_close) hours.append(el('em', 'mh-early', 'Early close'));
+  box.append(hours, sessionBar(session, open));
+  const later = state.sessions.filter((item) => item !== session).slice(0, 4)
+    .map((item) => `${dayLabel(item.open_at)} ${localTime(item.open_at)}–${localTime(item.close_at)}${item.early_close ? ' (early close)' : ''}`);
+  box.append(el('p', 'mh-foot', `${later.length ? `Then: ${later.join(' · ')}. ` : ''}The autopilot only buys and sells inside these hours. ${marketHours.note}`));
+}
+
 function ago(iso) {
   if (!iso) return 'never';
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -42,7 +140,12 @@ function renderAutopilotBar(ap) {
   const stateLine = el('div', 'ap-state');
   stateLine.append(el('i'), el('span', '', ap.enabled ? `Autopilot on · ${ap.status.replaceAll('_', ' ')}` : 'Autopilot off'));
   left.append(stateLine);
-  left.append(el('p', 'ap-message', ap.message || (ap.enabled ? 'Waiting for the next check.' : 'Research keeps running. No automatic buys or evidence exits are sent.')));
+  let message = ap.message || (ap.enabled ? 'Waiting for the next check.' : 'Research keeps running. No automatic buys or evidence exits are sent.');
+  const nextSession = marketState()?.next;
+  if (ap.enabled && ap.status === 'waiting_for_market' && nextSession) {
+    message = `US market closed. Trading resumes ${dayLabel(nextSession.open_at)} at ${localTime(nextSession.open_at)} your time (${untilText(nextSession.open_at)}); no buys or exits until then.`;
+  }
+  left.append(el('p', 'ap-message', message));
   const s = ap.settings;
   left.append(el('p', 'ap-meta', `${ap.positions_used}/${s.max_positions} positions · ${ap.buys_today}/${s.max_new_per_day} buys today · €${s.budget_eur_per_position} each · checks every ${Math.round(ap.entry_interval_seconds / 60)} min in US market hours · last check ${ago(ap.last_checked_at)}`));
   const button = el('button', ap.enabled ? 'outline' : 'primary small', ap.enabled ? 'Pause autopilot' : 'Set up autopilot');
@@ -196,6 +299,8 @@ function settingsPayload() {
 async function refreshWatchlist() {
   try {
     watchBoard = await api('/api/watchlist');
+    marketHours = watchBoard.market || null;
+    renderMarketHours();
     renderAutopilotBar(watchBoard.autopilot);
     renderSources(watchBoard.research);
     renderWatchRows();
@@ -319,3 +424,4 @@ document.addEventListener('keydown', (event) => { if (event.key === 'Escape') $(
 
 refreshWatchlist();
 setInterval(() => { if (!document.hidden) refreshWatchlist(); }, 30000);
+setInterval(() => { if (!document.hidden) renderMarketHours(); }, 20000);
