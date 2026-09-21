@@ -108,7 +108,7 @@ Every merge to `main` that changes code runs the [Release workflow](.github/work
 
 1. It runs the tests.
 2. It works out the next version from the commit messages since the last `v*` tag.
-3. It pushes the image to Docker Hub.
+3. It pushes the image to the GitHub Container Registry, and to Docker Hub if that is set up.
 4. It tags the commit and publishes a GitHub release with generated notes.
 
 The tag is created last, so a failed test, build or push never leaves a version without an image. Changes that only touch docs don't trigger a release.
@@ -122,17 +122,20 @@ The tag is created last, so a failed test, build or push never leaves a version 
 The first release is `v0.1.0`. To force a specific bump, use **Actions → Release → Run workflow**. Each image is tagged with the full version, the minor line, `latest` and the short commit SHA, and carries build provenance and a software bill of materials:
 
 ```bash
-docker pull <docker-hub-user>/tradingbot:0.4.2
+docker pull ghcr.io/matthias-johannes-mack/trading-bot:0.4.2
+docker pull wirefire071/trading-bot:0.4.2
 ```
 
-To run a published image instead of building locally, replace `build: .` in `compose.yaml` with `image: <docker-hub-user>/tradingbot:0.4.2`.
+To run a published image instead of building locally, replace `build: .` in `compose.yaml` with `image: ghcr.io/matthias-johannes-mack/trading-bot:0.4.2` or `image: wirefire071/trading-bot:0.4.2`.
 
-**One-time setup:** a free Docker Hub account is enough for public images. Under **Settings → Secrets and variables → Actions** in this repository, add:
+The GitHub Container Registry needs no setup: it is free for public repositories, and the workflow signs in with its own short-lived token. The image is linked to this repository and listed under **Packages**.
 
-- the variable `DOCKERHUB_USERNAME`: your Docker Hub user name, in lowercase;
+**Docker Hub:** the same tags go to [`wirefire071/trading-bot`](https://hub.docker.com/r/wirefire071/trading-bot) when these exist under **Settings → Secrets and variables → Actions** in this repository. A free Docker Hub account is enough for public images.
+
+- the variable `DOCKERHUB_USERNAME`: `wirefire071`;
 - the secret `DOCKERHUB_TOKEN`: a Docker Hub personal access token with Read & Write scope, created under Docker Hub → Account settings → Personal access tokens.
 
-Until both exist, the workflow stops with an error that names what's missing, and no version is tagged.
+Without them, releases go to the GitHub Container Registry only, and the run shows a notice saying Docker Hub was skipped.
 
 ## What the app does
 
