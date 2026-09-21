@@ -137,6 +137,44 @@ The GitHub Container Registry needs no setup: it is free for public repositories
 
 Without them, releases go to the GitHub Container Registry only, and the run shows a notice saying Docker Hub was skipped. If you set up Docker Hub after a release, run **Actions → Release → Run workflow** with `republish`. It copies the latest release, including its provenance and SBOM, to Docker Hub with the same tags, without building again or creating a new version.
 
+## Auto-update from Docker Hub
+
+[`compose.hub.example.yaml`](compose.hub.example.yaml) runs the published image and keeps it on the newest release. [What's Up Docker](https://getwud.github.io/wud/) (WUD) checks Docker Hub every 15 minutes for a newer `x.y.z` tag of `wirefire071/trading-bot`. When it finds one, it:
+
+1. writes the new tag into your local `compose.hub.yaml`;
+2. pulls the image;
+3. replaces the `guardrail` container with the same settings and data volume;
+4. deletes the old image.
+
+WUD only watches containers labelled `wud.watch=true`, so no other container on your machine is watched or touched. Its dashboard is at [http://127.0.0.1:3100](http://127.0.0.1:3100); log in as `admin`.
+
+One-time setup, in PowerShell from the repository folder:
+
+1. Add `WUD_ADMIN_PASSWORD=` with a password of your choice to `.env`.
+2. Copy the template; your copy is git-ignored because WUD edits it:
+
+   ```powershell
+   Copy-Item compose.hub.example.yaml compose.hub.yaml
+   ```
+
+3. Stop the locally built app. Your data volume is kept:
+
+   ```powershell
+   docker compose down
+   ```
+
+4. Start the published image and WUD:
+
+   ```powershell
+   docker compose -f compose.hub.yaml up -d
+   ```
+
+The hub setup uses the same project, service and volume names as `compose.yaml`, so Guardrail keeps its data when you switch. Run one setup or the other, not both. To go back to building from source, run `docker compose -f compose.hub.yaml down`, then `docker compose up --build -d`.
+
+- **Every release is applied automatically, including major versions.** To hold back major releases, add `WUD_TRIGGER_DOCKERCOMPOSE_GUARDRAIL_THRESHOLD: minor` to the `wud` service.
+- **Running `docker compose -f compose.hub.yaml up -d` after an update** restarts Guardrail once. It keeps the new version, because the tag in `compose.hub.yaml` was updated too.
+- **WUD has access to the Docker socket, which means full control of Docker on this machine.** That's why its image is pinned by digest and its dashboard only listens on `127.0.0.1`.
+
 ## What the app does
 
 - Calculates euro hard-stop and trailing levels for simulation.
