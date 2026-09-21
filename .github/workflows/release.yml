@@ -34,7 +34,8 @@ permissions:
   contents: read
 
 env:
-  IMAGE_NAME: tradingbot
+  # Same repository name on both registries (Docker Hub: wirefire071/trading-bot).
+  IMAGE_NAME: trading-bot
 
 jobs:
   test:

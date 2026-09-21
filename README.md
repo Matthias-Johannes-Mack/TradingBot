@@ -122,16 +122,17 @@ The tag is created last, so a failed test, build or push never leaves a version 
 The first release is `v0.1.0`. To force a specific bump, use **Actions → Release → Run workflow**. Each image is tagged with the full version, the minor line, `latest` and the short commit SHA, and carries build provenance and a software bill of materials:
 
 ```bash
-docker pull ghcr.io/matthias-johannes-mack/tradingbot:0.4.2
+docker pull ghcr.io/matthias-johannes-mack/trading-bot:0.4.2
+docker pull wirefire071/trading-bot:0.4.2
 ```
 
-To run a published image instead of building locally, replace `build: .` in `compose.yaml` with `image: ghcr.io/matthias-johannes-mack/tradingbot:0.4.2`.
+To run a published image instead of building locally, replace `build: .` in `compose.yaml` with `image: ghcr.io/matthias-johannes-mack/trading-bot:0.4.2` or `image: wirefire071/trading-bot:0.4.2`.
 
 The GitHub Container Registry needs no setup: it is free for public repositories, and the workflow signs in with its own short-lived token. The image is linked to this repository and listed under **Packages**.
 
-**Docker Hub (optional):** to publish the same tags as `<docker-hub-user>/tradingbot` too, add these under **Settings → Secrets and variables → Actions** in this repository. A free Docker Hub account is enough for public images.
+**Docker Hub:** the same tags go to [`wirefire071/trading-bot`](https://hub.docker.com/r/wirefire071/trading-bot) when these exist under **Settings → Secrets and variables → Actions** in this repository. A free Docker Hub account is enough for public images.
 
-- the variable `DOCKERHUB_USERNAME`: your Docker Hub user name, in lowercase;
+- the variable `DOCKERHUB_USERNAME`: `wirefire071`;
 - the secret `DOCKERHUB_TOKEN`: a Docker Hub personal access token with Read & Write scope, created under Docker Hub → Account settings → Personal access tokens.
 
 Without them, releases go to the GitHub Container Registry only, and the run shows a notice saying Docker Hub was skipped.
