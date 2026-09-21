@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A local paper-trading autopilot driven by free public research data." />
+    <title>Guardrail | Research autopilot</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/broker.css" />
+    <link rel="stylesheet" href="/static/watchlist.css" />
+    <style>[hidden] { display: none !important; }</style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <a class="brand" href="/"><span>G</span>Guardrail</a>
+        <p class="status"><i></i> Local app · Alpaca paper</p>
+      </header>
+      <section class="intro">
+        <div><p class="kicker">Research autopilot · paper trading</p><h1>Know why it buys before it buys.</h1><p>Free public research is ranked into a watchlist: insider buying, House trade disclosures, federal contracts, Google Trends and retail chatter. The autopilot buys only what clears every gate, and every position gets its own trailing stop. Python makes each decision; the local AI only explains.</p></div>
+        <div class="privacy"><strong>Paper broker only</strong><span>The autopilot trades only on Alpaca's paper endpoint, and only after you preview and switch it on.</span></div>
+      </section>
+      <section class="card watch-panel" aria-labelledby="watch-title">
+        <div class="card-title"><div><p class="kicker">Research autopilot · free public data</p><h2 id="watch-title">Watchlist</h2></div><div class="watch-head-actions"><button type="button" class="text-btn" id="research-refresh">Refresh sources</button><button type="button" class="text-btn" id="watch-reload">Reload</button></div></div>
+        <p class="watch-intro">Insider buying from SEC Form 4, US House trade disclosures, new federal contracts, Google Trends and retail chatter are collected in the background and scored. Every row says what the autopilot intends to do with that symbol and why. Python does all the scoring; no data feed costs money.</p>
+        <div class="autopilot-bar" id="autopilot-bar" aria-live="polite"><div><div class="ap-state"><i></i><span>Loading autopilot…</span></div></div></div>
+        <div class="source-strip" id="source-strip"></div>
+        <div class="watch-toolbar"><div class="watch-filter" aria-label="Filter watchlist"><button type="button" data-filter="all" class="active">All</button><button type="button" data-filter="act">Buy / sell</button><button type="button" data-filter="HOLD">Holding</button><button type="button" data-filter="WATCH">Watching</button><button type="button" data-filter="radar">Radar</button></div><form id="watch-add" class="watch-add"><label class="sr" for="watch-symbol">Add a symbol to the watchlist</label><input id="watch-symbol" maxlength="10" placeholder="Add symbol, e.g. MSFT" autocomplete="off" /><button class="outline" type="submit">Add</button></form></div>
+        <p id="watch-message" class="ap-hint" aria-live="polite"></p>
+        <div id="watch-rows" class="watch-rows"><p class="empty">Loading research…</p></div>
+        <div class="watch-lower">
+          <section class="decision-log" aria-labelledby="decision-title"><h3 id="decision-title">Autopilot log</h3><ol id="decision-log"></ol></section>
+          <details class="autopilot-config" id="autopilot-config"><summary>Autopilot settings and switch</summary>
+            <form id="autopilot-form">
+              <div class="fields">
+                <label>Buy score<input name="min_score" type="number" min="55" max="95" step="1" required /></label>
+                <label>Sources needed<input name="min_sources" type="number" min="1" max="5" step="1" required /></label>
+                <label>Or one-source score<input name="strong_score" type="number" min="60" max="99" step="1" required /></label>
+                <label>€ per position<input name="budget_eur_per_position" type="number" min="10" step="10" required /></label>
+                <label>Max positions<input name="max_positions" type="number" min="1" max="20" required /></label>
+                <label>New buys per day<input name="max_new_per_day" type="number" min="1" max="10" required /></label>
+                <label>Hard floor %<input name="hard_floor_pct" type="number" min="1" max="49" step="0.5" required /></label>
+                <label>Trail after +%<input name="trail_trigger_pct" type="number" min="1" max="100" step="0.5" required /></label>
+                <label>Trail distance %<input name="trail_distance_pct" type="number" min="1" max="49" step="0.5" required /></label>
+                <label>Sell below score<input name="exit_score" type="number" min="5" max="49" step="1" required /></label>
+                <label>Cooldown days<input name="cooldown_days" type="number" min="0" max="90" required /></label>
+                <label>Min price ($)<input name="min_price_usd" type="number" min="1" step="0.5" required /></label>
+                <label>Min IEX $/day<input name="min_iex_dollar_volume_usd" type="number" min="0" step="50000" required /></label>
+              </div>
+              <div class="ap-checks">
+                <label><input type="checkbox" name="block_on_caution" /> Skip names with crowding flags (search spikes, one-sided social chatter, insider or congress selling).</label>
+                <label><input type="checkbox" name="exit_on_bearish_evidence" /> Sell an autopilot position when its evidence turns bearish, not only when a stop fills.</label>
+              </div>
+              <button type="submit" class="outline" id="ap-preview-button">Preview autopilot</button>
+              <p class="ap-hint">Scores run 0 to 100; 50 means no evidence either way. Positions are whole shares bought with market orders, each protected by its own automatic stop plan.</p>
+            </form>
+            <div id="ap-preview" class="ap-preview" hidden><h3>Confirm autopilot</h3><div id="ap-preview-details"></div><label class="auto-ack"><input type="checkbox" id="ap-ack" /> I authorize the autopilot to buy and sell on my Alpaca paper account without asking again, within these limits, including loss-making exits.</label><button type="button" class="primary small" id="ap-activate" disabled>Switch autopilot on</button></div>
+            <p id="ap-result" class="ap-hint" aria-live="polite"></p>
+          </details>
+        </div>
+      </section>
+      <section class="grid">
+        <form id="strategy-form" class="card controls">
+          <div class="card-title"><div><p class="kicker">01 / Configure</p><h2>Your paper position</h2></div><button type="button" class="text-btn" id="reset">Reset</button></div>
+          <div class="fields four"><label>Symbol<input name="symbol" value="TSLA" maxlength="10" required /></label><label>Shares<input name="shares_owned" type="number" min="1" value="10" required /></label><label>Entry price (€)<input name="entry_price" type="number" min="0.01" step="0.01" value="250" required /></label><label>Current price (€)<input name="current_price" type="number" min="0.01" step="0.01" value="250" required /></label></div>
+          <div class="rule"><b>1</b><div><h3>Hard floor <em class="red">protect principal</em></h3><p>Simulate selling the open position below this loss from entry.</p></div><label class="small-field">Loss limit<input name="hard_floor_pct" type="number" min="1" max="99" value="10" required /><span>%</span></label></div>
+          <div class="rule"><b>2</b><div><h3>Trailing floor <em class="green">moves up only</em></h3><p>After a gain, keep the stop this far below the highest observed price.</p></div><div class="mini-fields"><label class="small-field">Start after<input name="trail_trigger_pct" type="number" min="1" value="10" required /><span>%</span></label><label class="small-field">Trail by<input name="trail_distance_pct" type="number" min="1" max="99" value="5" required /><span>%</span></label></div></div>
+          <div class="rule"><b>3</b><div><h3>Dip-buy ladder <em class="gold">average in</em></h3><p>Simulate a fixed-size paper buy at each lower level.</p></div><div class="mini-fields"><label class="small-field">Every<input name="ladder_step_pct" type="number" min="1" max="99" value="20" required /><span>%</span></label><label class="small-field">Buy<input name="ladder_shares" type="number" min="1" value="20" required /><span>sh</span></label></div></div>
+          <div class="settings"><label class="check"><input name="ladder_levels" type="number" min="1" max="10" value="3" /> <span>Ladder levels</span></label><p>Price evaluation happens when you submit a paper price tick.</p></div>
+          <section class="tax-settings" aria-labelledby="tax-title"><h3 id="tax-title">Baden-Württemberg tax estimate</h3><p>German tax is estimated on positive EUR gains only. The broker does not withhold it. Enter your actual EUR acquisition cost before a profit-taking sell.</p><div class="fields tax-fields"><label>Church tax<select name="church_tax_rate_pct"><option value="0" selected>0% · 26,38% total</option><option value="8">8% · if applicable in BW</option><option value="9">9% · Bad Wimpfen exception</option></select></label><label>Unused allowance (€)<input name="remaining_allowance_eur" type="number" min="0" max="2000" step="0.01" value="0" required /></label><label>Estimated buy fee (€)<input name="buy_fee_eur" type="number" min="0" step="0.01" value="0" required /></label><label>Estimated sell fee (€)<input name="sell_fee_eur" type="number" min="0" step="0.01" value="0" required /></label><label>Minimum net gain (€)<input name="minimum_net_profit_eur" type="number" min="0.01" step="0.01" value="0.01" required /></label><label>Broker EUR cost/share (€)<input name="broker_cost_basis_eur_per_share" type="number" min="0.01" step="0.01" placeholder="Actual historical cost" /></label></div><p class="tax-help">Defaults use 26,375% internally (shown as 26,38%), no church tax and no unused allowance. Your EUR cost per share should include allocated purchase expenses.</p></section>
+          <button class="primary" type="submit">Review paper orders <span>→</span></button>
+        </form>
+        <aside class="right-side">
+          <section class="card preview"><div class="card-title"><div><p class="kicker">02 / Review</p><h2>Order preview</h2></div><span class="badge">Draft</span></div><div id="preview-empty" class="empty">Fill in your position to preview the paper orders.</div><div id="preview-content" hidden><div id="position-label" class="position-label"></div><div id="orders"></div><div id="simulation-tax"></div><p class="disclaimer">The LLM cannot change order values. This simulation is not investment advice.</p></div></section>
+          <section class="card action-card"><div><p class="kicker">03 / Confirm</p><h2 id="confirm-title">Awaiting review</h2><p id="confirm-copy">Review calculated orders before arming the paper strategy.</p></div><div class="action-row"><button type="button" class="outline" id="explain" disabled>Explain with local AI</button><button type="button" class="primary small" id="arm" disabled>Arm paper strategy</button></div><p class="model-note" id="model-note">Uses a local Ollama model when available.</p></section>
+        </aside>
+      </section>
+      <section class="card broker-panel" aria-labelledby="broker-title"><div class="card-title"><div><p class="kicker">Alpaca paper broker</p><h2 id="broker-title">Broker orders</h2></div><button type="button" class="text-btn" id="refresh-broker">Refresh</button></div><p id="broker-status">Checking connection…</p><p id="broker-position"></p><p id="fx-line"></p><div id="broker-open-orders"></div><div class="chart-panel"><div class="chart-heading"><div><h3 id="chart-title">TSLA candles</h3><p id="chart-meta">Loading IEX data…</p></div><div class="chart-controls"><label>Levels<select id="chart-overlays"><option value="orders" selected>Open orders</option><option value="plan">Reviewed plan</option></select></label><label>Timeframe<select id="chart-timeframe"><option value="1Min">1 minute</option><option value="5Min" selected>5 minutes</option><option value="1Day">1 day</option></select></label></div></div><canvas id="broker-chart" role="img" aria-label="Candlestick chart with open broker orders and optional reviewed plan levels"></canvas><div id="chart-legend" class="chart-legend"></div><p class="chart-note">Updates every 15 seconds while this page is visible. IEX covers one exchange. Orders without a fixed price do not draw a line; out-of-range levels are listed below the candles. EUR estimates use the shown ECB rate.</p></div><div class="broker-controls"><label>Paper order<select id="broker-kind"><option value="market_buy">Buy shares at market</option><option value="hard_stop">Place hard stop</option><option value="ladder_buy">Place ladder buy limit</option><option value="trailing_stop">Activate trailing stop</option><option value="take_profit_limit">Take profit with limit</option></select></label><label id="broker-level-label" hidden>Ladder level<input type="number" id="broker-level" min="1" max="10" value="1" /></label><label id="broker-target-label" hidden>Target exit (€ / share)<input type="number" id="broker-target" min="0.01" step="0.01" placeholder="After-tax target" /></label><button type="button" class="outline" id="broker-preview-button">Preview broker order</button></div><p class="broker-help">Protective stops may realize a loss and are exempt from the net-profit gate. Profit-taking limits require an actual EUR cost basis and must pass the after-tax minimum at preview and confirmation. USD fills and future FX can still change actual profit.</p><div id="broker-preview" class="broker-preview" hidden><h3>Review USD submission</h3><div id="broker-preview-details"></div><button type="button" class="primary small" id="broker-confirm">Submit Alpaca paper order</button></div><div id="broker-result" aria-live="polite"></div></section>
+      <section class="card automation-panel" aria-labelledby="automation-title"><div class="card-title"><div><p class="kicker">Persistent market-hours scheduler</p><h2 id="automation-title">Automatic paper plan</h2></div><button type="button" class="text-btn" id="refresh-automation">Refresh</button></div><p>The Docker worker checks Alpaca's market clock every 30 seconds. It only trades after you preview and explicitly activate this plan. A closed browser does not stop it.</p><div id="automation-status" class="automation-status">No confirmed automatic plan.</div><button type="button" class="outline" id="automation-preview-button">Preview automatic plan</button><div id="automation-preview" class="automation-preview" hidden><h3>Confirm automatic paper orders</h3><div id="automation-preview-details"></div><label class="auto-ack"><input type="checkbox" id="automation-ack" /> I authorize this saved plan to place and replace Alpaca paper orders automatically during market hours, including loss-making protective exits and dip re-entries.</label><button type="button" class="primary small" id="automation-activate" disabled>Activate automatic paper plan</button></div><div id="automation-result" aria-live="polite"></div></section>
+      <section class="card monitor"><div class="card-title"><div><p class="kicker">Local simulation</p><h2>Simulate a price tick</h2></div><span id="monitor-status" class="badge muted">Not armed</span></div><p>Test how the euro strategy responds without submitting broker orders.</p><div class="tick-row"><label>Simulated price (€)<input type="number" id="tick-price" min="0.01" step="0.01" value="250" /></label><button type="button" class="outline" id="send-tick" disabled>Evaluate tick</button></div><div id="activity" class="activity"><p>No paper activity yet.</p></div></section>
+    </main>
+    <div class="modal" id="modal" hidden><div class="modal-box"><button class="close" id="close-modal" aria-label="Close">×</button><p class="kicker">Local AI explanation</p><h2>Plan review</h2><div id="explanation">Asking your local Ollama model…</div></div></div>
+    <div class="modal" id="evidence-modal" hidden><div class="modal-box"><button class="close" id="close-evidence" aria-label="Close">×</button><p class="kicker">Evidence</p><h2 id="evidence-title">Symbol</h2><div id="evidence-body"></div></div></div>
+    <script src="/static/app.js"></script>
+    <script src="/static/watchlist.js"></script>
+  </body>
+</html>

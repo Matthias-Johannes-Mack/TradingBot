@@ -1,0 +1,24 @@
+services:
+  guardrail:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - guardrail_state:/app/data
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
+      ALPACA_API_URL: https://paper-api.alpaca.markets/v2
+      APCA_API_KEY_ID: ${APCA_API_KEY_ID:-}
+      APCA_API_SECRET_KEY: ${APCA_API_SECRET_KEY:-}
+      GUARDRAIL_CONTACT: ${GUARDRAIL_CONTACT:-}
+      GUARDRAIL_RESEARCH: ${GUARDRAIL_RESEARCH:-on}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+volumes:
+  guardrail_state:
