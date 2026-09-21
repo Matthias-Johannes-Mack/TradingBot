@@ -1,0 +1,70 @@
+# Run the published Docker Hub image and keep it on the newest release.
+#
+#   copy compose.hub.example.yaml compose.hub.yaml     (Windows; cp on macOS/Linux)
+#   docker compose -f compose.hub.yaml up -d
+#
+# What's Up Docker (WUD) checks Docker Hub every 15 minutes for a newer x.y.z
+# tag of wirefire071/trading-bot. When it finds one, it rewrites the image tag
+# in compose.hub.yaml (your local, git-ignored copy) and recreates only the
+# guardrail container with the same settings and the same data volume.
+# Other containers on this machine are never watched or touched.
+#
+# Uses the same project name, service and volume as compose.yaml, so it
+# replaces a locally built Guardrail and keeps its data. Run one or the other.
+# Needs WUD_ADMIN_PASSWORD in .env; open http://127.0.0.1:3100 and log in as admin.
+
+services:
+  guardrail:
+    # WUD rewrites this tag; keep it a plain x.y.z version, not "latest".
+    image: wirefire071/trading-bot:0.1.1
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - guardrail_state:/app/data
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
+      ALPACA_API_URL: https://paper-api.alpaca.markets/v2
+      APCA_API_KEY_ID: ${APCA_API_KEY_ID:-}
+      APCA_API_SECRET_KEY: ${APCA_API_SECRET_KEY:-}
+      GUARDRAIL_CONTACT: ${GUARDRAIL_CONTACT:-}
+      GUARDRAIL_RESEARCH: ${GUARDRAIL_RESEARCH:-on}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      wud.watch: "true"
+      # Only plain releases such as 0.1.2; ignores latest, 0.1 and sha-* tags.
+      wud.tag.include: '^\d+\.\d+\.\d+$'
+      wud.trigger.include: dockercompose.guardrail
+      wud.display.name: Guardrail
+      wud.link.template: "https://github.com/Matthias-Johannes-Mack/TradingBot/releases/tag/v$${major}.$${minor}.$${patch}"
+
+  wud:
+    # Pinned by digest: this container can control Docker, so its image must not change silently.
+    image: getwud/wud:9.0.2@sha256:257b2221f201a0231db295b662882c5873ff72dc687be94dbae2e15f5394f151
+    ports:
+      - "127.0.0.1:3100:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./compose.hub.yaml:/wud/compose.yaml
+      - wud_store:/store
+    environment:
+      # Watch only containers labelled wud.watch=true (Guardrail), never the rest of this machine.
+      WUD_WATCHER_LOCAL_WATCHBYDEFAULT: "false"
+      WUD_WATCHER_LOCAL_CRON: "*/15 * * * *"
+      WUD_TRIGGER_DOCKERCOMPOSE_GUARDRAIL_FILE: /wud/compose.yaml
+      WUD_TRIGGER_DOCKERCOMPOSE_GUARDRAIL_PRUNE: "true"
+      WUD_AUTH_ADMIN_USER: admin
+      WUD_AUTH_ADMIN_PASSWORD: ${WUD_ADMIN_PASSWORD:?Set WUD_ADMIN_PASSWORD in .env before starting}
+    restart: unless-stopped
+    labels:
+      wud.watch: "false"
+
+volumes:
+  guardrail_state:
+  wud_store:

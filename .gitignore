@@ -3,3 +3,5 @@ __pycache__/
 *.py[cod]
 .env
 data/
+# Local copy of compose.hub.example.yaml; What's Up Docker rewrites its image tag.
+compose.hub.yaml
