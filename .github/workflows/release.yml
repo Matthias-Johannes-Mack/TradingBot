@@ -20,9 +20,9 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version part to increase (auto reads the commit messages)"
+        description: "Version part to increase (auto reads the commit messages). 'republish' copies the latest release to Docker Hub without a new version."
         type: choice
-        options: [auto, patch, minor, major]
+        options: [auto, patch, minor, major, republish]
         default: auto
 
 # Releases run one at a time, so two merges can never claim the same version.
@@ -43,7 +43,7 @@ jobs:
 
   version:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.bump != 'republish'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.next.outputs.version }}
@@ -165,6 +165,67 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Manual "republish": copy the latest release, attestations included, from
+  # GHCR to Docker Hub without building or creating a new version. Needed when
+  # Docker Hub is configured after a release was already published.
+  republish:
+    if: github.event_name == 'workflow_dispatch' && inputs.bump == 'republish' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Find the latest release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ "$HAS_TOKEN" != true ]; then
+            echo "::error title=Docker Hub is not configured::Republishing copies the latest release to Docker Hub. Add the repository variable DOCKERHUB_USERNAME and the secret DOCKERHUB_TOKEN first."
+            exit 1
+          fi
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          version="${tag#v}"
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+          echo "Republishing $tag (${sha:0:7}) to Docker Hub."
+          {
+            echo "source=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$IMAGE_NAME:$version"
+            echo "target=docker.io/${DOCKERHUB_USERNAME,,}/$IMAGE_NAME"
+            echo "version=$version"
+            echo "minor=${version%.*}"
+            echo "short_sha=${sha:0:7}"
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Copy the release image to Docker Hub
+        env:
+          SOURCE: ${{ steps.latest.outputs.source }}
+          TARGET: ${{ steps.latest.outputs.target }}
+          VERSION: ${{ steps.latest.outputs.version }}
+          MINOR: ${{ steps.latest.outputs.minor }}
+          SHORT_SHA: ${{ steps.latest.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "$TARGET:$VERSION" --tag "$TARGET:$MINOR" \
+            --tag "$TARGET:latest" --tag "$TARGET:sha-$SHORT_SHA" \
+            "$SOURCE"
+          docker buildx imagetools inspect "$TARGET:$VERSION"
 
   release:
     needs: [version, image]

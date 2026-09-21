@@ -135,7 +135,7 @@ The GitHub Container Registry needs no setup: it is free for public repositories
 - the variable `DOCKERHUB_USERNAME`: `wirefire071`;
 - the secret `DOCKERHUB_TOKEN`: a Docker Hub personal access token with Read & Write scope, created under Docker Hub → Account settings → Personal access tokens.
 
-Without them, releases go to the GitHub Container Registry only, and the run shows a notice saying Docker Hub was skipped.
+Without them, releases go to the GitHub Container Registry only, and the run shows a notice saying Docker Hub was skipped. If you set up Docker Hub after a release, run **Actions → Release → Run workflow** with `republish`. It copies the latest release, including its provenance and SBOM, to Docker Hub with the same tags, without building again or creating a new version.
 
 ## What the app does
 
