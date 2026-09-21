@@ -102,6 +102,38 @@ The Alpaca Trading API paper account and US stock order prices are USD. The app'
 
 Open `http://127.0.0.1:8000`.
 
+## Releases and Docker image
+
+Every merge to `main` that changes code runs the [Release workflow](.github/workflows/release.yml):
+
+1. It runs the tests.
+2. It works out the next version from the commit messages since the last `v*` tag.
+3. It pushes the image to Docker Hub.
+4. It tags the commit and publishes a GitHub release with generated notes.
+
+The tag is created last, so a failed test, build or push never leaves a version without an image. Changes that only touch docs don't trigger a release.
+
+| Commit message since the last release | Next version |
+| --- | --- |
+| `feat!: ...` or a `BREAKING CHANGE:` line in the body | major, `0.4.1` → `1.0.0` |
+| `feat: ...` | minor, `0.4.1` → `0.5.0` |
+| anything else | patch, `0.4.1` → `0.4.2` |
+
+The first release is `v0.1.0`. To force a specific bump, use **Actions → Release → Run workflow**. Each image is tagged with the full version, the minor line, `latest` and the short commit SHA, and carries build provenance and a software bill of materials:
+
+```bash
+docker pull <docker-hub-user>/tradingbot:0.4.2
+```
+
+To run a published image instead of building locally, replace `build: .` in `compose.yaml` with `image: <docker-hub-user>/tradingbot:0.4.2`.
+
+**One-time setup:** a free Docker Hub account is enough for public images. Under **Settings → Secrets and variables → Actions** in this repository, add:
+
+- the variable `DOCKERHUB_USERNAME`: your Docker Hub user name, in lowercase;
+- the secret `DOCKERHUB_TOKEN`: a Docker Hub personal access token with Read & Write scope, created under Docker Hub → Account settings → Personal access tokens.
+
+Until both exist, the workflow stops with an error that names what's missing, and no version is tagged.
+
 ## What the app does
 
 - Calculates euro hard-stop and trailing levels for simulation.
@@ -110,6 +142,10 @@ Open `http://127.0.0.1:8000`.
 - Accepts manual euro price ticks and records simulated fills.
 - Uses `langchain-ollama` only for explanation; risk levels and simulated orders are calculated in Python, never delegated to the LLM.
 - Scores free public research into a watchlist and, when switched on, runs a limit-bound paper autopilot.
+
+## Contributing
+
+Issues and pull requests are welcome. `main` is protected: every change goes through a pull request, needs the tests to pass and needs an approving review from the code owner (see [CODEOWNERS](.github/CODEOWNERS)). Force pushes and deleting `main` are blocked. Workflows from outside contributors' pull requests only run after approval, and pull requests from forks never receive the Docker Hub token.
 
 ## Data sources and terms
 
