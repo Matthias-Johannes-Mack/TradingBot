@@ -1,6 +1,10 @@
 # Guardrail paper-trading assistant
 
+[![Tests](https://github.com/Matthias-Johannes-Mack/TradingBot/actions/workflows/tests.yml/badge.svg)](https://github.com/Matthias-Johannes-Mack/TradingBot/actions/workflows/tests.yml)
+
 Guardrail ranks free public research (insider trades, US House trade disclosures, federal contracts, Google Trends and retail chatter) into a watchlist. An optional autopilot turns that watchlist into Alpaca **paper** positions within hard limits. Every position gets a protective stop, and every decision is logged with its evidence. It also builds trailing-stop and dip-buy plans in euros, which a free local LLM can explain. Manual broker orders are submitted only after a separate preview and confirmation.
+
+![Guardrail dashboard: the research watchlist with the autopilot switch, US trading hours in local time, source status, and symbols scored from insider, House, contract and retail evidence](docs/watchlist.png)
 
 ## Run in Docker
 
@@ -107,4 +111,10 @@ Open `http://127.0.0.1:8000`.
 - Uses `langchain-ollama` only for explanation; risk levels and simulated orders are calculated in Python, never delegated to the LLM.
 - Scores free public research into a watchlist and, when switched on, runs a limit-bound paper autopilot.
 
-This project is educational software, not investment advice.
+## Data sources and terms
+
+Every research source is free and public, and the app reads it at low volume for personal research. The SEC asks automated clients to identify themselves with a contact email (`GUARDRAIL_CONTACT`) and to stay under 10 requests a second; the app waits between calls to every host. Google Trends, StockTwits and ApeWisdom are read through the same endpoints their websites use. These are not documented public APIs, so they can change or refuse access at any time. Check each site's terms before using this beyond personal, educational use.
+
+## License
+
+[MIT](LICENSE). This project is educational software, not investment advice.
